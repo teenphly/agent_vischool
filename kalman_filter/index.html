@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>卡尔曼滤波动画实验室</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage-panel" aria-label="卡尔曼滤波动画">
+        <header class="topbar">
+          <div class="title-block">
+            <p class="eyebrow">Kalman Filter Lab</p>
+            <h1>卡尔曼滤波：在噪声里追踪一个移动目标</h1>
+          </div>
+          <div class="readout-grid" aria-label="实时数值">
+            <div class="readout">
+              <span>真实位置</span>
+              <strong id="truthReadout">0.0</strong>
+            </div>
+            <div class="readout">
+              <span>传感器读数</span>
+              <strong id="measurementReadout">0.0</strong>
+            </div>
+            <div class="readout">
+              <span>滤波估计</span>
+              <strong id="estimateReadout">0.0</strong>
+            </div>
+            <div class="readout">
+              <span>卡尔曼增益 K</span>
+              <strong id="gainReadout">0.00</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="animation-wrap">
+          <canvas id="kalmanCanvas" width="1280" height="820" aria-label="移动目标、测量噪声、预测和校正的动画"></canvas>
+          <div class="legend-strip" aria-label="图例">
+            <span><i class="swatch truth"></i>真实轨迹</span>
+            <span><i class="swatch measurement"></i>带噪声测量</span>
+            <span><i class="swatch prediction"></i>预测</span>
+            <span><i class="swatch estimate"></i>滤波估计</span>
+            <span><i class="swatch uncertainty"></i>不确定度</span>
+          </div>
+        </div>
+
+        <footer class="control-bar" aria-label="动画控制">
+          <button class="icon-button" id="playToggle" type="button" aria-label="暂停动画" data-tooltip="播放/暂停">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path id="playIconA" class="play-shape" d="M8 5h3v14H8z" />
+              <path id="playIconB" class="play-shape" d="M14 5h3v14h-3z" />
+            </svg>
+          </button>
+          <button class="icon-button" id="resetButton" type="button" aria-label="重置动画" data-tooltip="重置">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12a7 7 0 1 0 2.05-4.95" />
+              <path d="M5 4v5h5" />
+            </svg>
+          </button>
+          <label class="range-control">
+            <span>动画速度</span>
+            <input id="speedSlider" type="range" min="1" max="100" step="1" value="14" />
+          </label>
+          <label class="range-control">
+            <span>传感器噪声 R</span>
+            <input id="noiseSlider" type="range" min="2" max="42" value="18" />
+          </label>
+          <label class="range-control">
+            <span>模型不确定 Q</span>
+            <input id="modelSlider" type="range" min="1" max="34" value="9" />
+          </label>
+          <label class="switch">
+            <input id="outlierSwitch" type="checkbox" checked />
+            <span>偶发坏读数</span>
+          </label>
+        </footer>
+      </section>
+
+      <aside class="lesson-panel" aria-label="分步讲解">
+        <nav class="step-tabs" aria-label="课程步骤">
+          <button class="step-tab is-active" type="button" data-step="0">1 观察</button>
+          <button class="step-tab" type="button" data-step="1">2 预测</button>
+          <button class="step-tab" type="button" data-step="2">3 校正</button>
+          <button class="step-tab" type="button" data-step="3">4 增益</button>
+          <button class="step-tab" type="button" data-step="4">5 向量</button>
+        </nav>
+
+        <article class="lesson-card" id="lessonCard">
+          <p class="eyebrow" id="stepKicker">第一层：别急着算</p>
+          <h2 id="stepTitle">先看见问题：测量会抖，但目标不会乱跳</h2>
+          <p id="stepBody">
+            橙色点是传感器读数，它围着绿色真实位置上下乱抖。卡尔曼滤波的出发点很朴素：不要完全相信单次测量，也不要死守自己的旧猜测。
+          </p>
+          <div class="memory-line" id="memoryLine">一句话：在“我预测的”和“我测到的”之间，按可信度取一个聪明的折中。</div>
+          <div class="formula-panel" id="formulaPanel">先把测量记作 z，把估计记作 x̂。</div>
+        </article>
+
+        <section class="math-panel" aria-label="数学细节">
+          <h3>数学细节</h3>
+          <div class="math-details" id="mathDetails"></div>
+          <div class="live-math" id="liveMathLine"></div>
+        </section>
+
+        <section class="intuition-panel" aria-label="当前直觉">
+          <h3>当前画面该看哪里</h3>
+          <div class="focus-grid">
+            <div>
+              <span>预测误差</span>
+              <strong id="predictionErrorReadout">0.0</strong>
+            </div>
+            <div>
+              <span>测量误差</span>
+              <strong id="measurementErrorReadout">0.0</strong>
+            </div>
+            <div>
+              <span>估计误差</span>
+              <strong id="estimateErrorReadout">0.0</strong>
+            </div>
+            <div>
+              <span>滤波态度</span>
+              <strong id="trustReadout">折中</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="micro-quiz" aria-label="小测">
+          <h3>小检查</h3>
+          <p id="quizQuestion">如果传感器噪声 R 变大，滤波器应该更相信测量，还是更相信自己的预测？</p>
+          <div class="quiz-actions" id="quizActions">
+            <button type="button" class="choice-button" data-choice="a">更相信测量</button>
+            <button type="button" class="choice-button" data-choice="b">更相信预测</button>
+          </div>
+          <p class="quiz-feedback" id="quizFeedback" aria-live="polite"></p>
+        </section>
+      </aside>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
